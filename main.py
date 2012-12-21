@@ -21,23 +21,16 @@ objLogger.setLevel(logging.INFO)
 
 
 objFeed = BbcEventFeed()
-#objFeed2 = BbcEventFeed()
-#objOutput = TerminalOutput()
 
 try:
 	objOutput = TerminalUi()
 	objVideOutput = objOutput.addScrollRegion(10, 70, 0, 0)
 	objVide = VidePrinter(objFeed, objVideOutput, objLogger)
 	objVide.start()
-#	time.sleep(2)
-#	objVideOutput2 = objOutput.addScrollRegion(10, 70, 0, 10)
-#	objVide2 = VidePrinter(objFeed2, objVideOutput2, objLogger)
-#	objVide2.start()
 except:
 	objLogger.error(traceback.format_exc())
 	if 'objVide' in locals():
 		objVide.stop()
-#		objVide2.stop()
 	if 'objOutput' in locals():
 		objOutput.__del__()
 		del objOutput
@@ -50,4 +43,3 @@ except:
 	objLogger.error(traceback.format_exc())
 finally:
 	objVide.stop()
-#	objVide2.stop()
