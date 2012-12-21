@@ -70,7 +70,7 @@ class VidePrinter(threading.Thread):
 			self._output_GOAL(e, True)
 
 	# Main event loop
-	# TODO: Tidy this shite up
+	# TODO: Tidy this up
 	def run(self):
 		try:
 			bolLastRunEmpty = False
@@ -81,7 +81,7 @@ class VidePrinter(threading.Thread):
 					if not bolLastRunEmpty:
 						self.objOutput.addLine([('No matches in progress', self.objOutput.C_GREEN)])
 					bolLastRunEmpty = True
-					time.sleep(60)
+					time.sleep(5)
 					continue
 
 				bolLastRunEmpty = False
