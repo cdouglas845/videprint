@@ -5,10 +5,16 @@ import traceback
 from models.matchevent import MatchEvent
 
 # Designed to run its own thread to allow multiple feeds
+# TODO: The output methods _really_ need separating out,
+#       currently its far too tightly coupled
 class VidePrinter(threading.Thread):
+
+	intFirstRunMaxEvents = 5
+
 	def __init__(self, objFeed, objOutput, objLogger):
 		self.__objStop     = threading.Event()
 		self._strLastEvent = None
+		self._bolReplay    = False
 		self.objFeed       = objFeed
 		self.objOutput     = objOutput
 		self.objLogger     = objLogger
@@ -17,6 +23,9 @@ class VidePrinter(threading.Thread):
 	def stop(self):
 		self.__objStop.set()
 		self.join()
+
+	def enableReplay(self):
+		self._bolReplay = True
 
 	def getLastEvent(self):
 		return self._strLastEvent
@@ -71,7 +80,9 @@ class VidePrinter(threading.Thread):
 
 	# Main event loop
 	# TODO: Tidy this up
+	# TODO: Change sleeps to allow interrupts
 	def run(self):
+		bolFirstRun = True
 		try:
 			bolLastRunEmpty = False
 			while not self.__objStop.isSet():
@@ -81,6 +92,7 @@ class VidePrinter(threading.Thread):
 					if not bolLastRunEmpty:
 						self.objOutput.addLine([('No matches in progress', self.objOutput.C_GREEN)])
 					bolLastRunEmpty = True
+					bolFirstRun     = False
 					time.sleep(5)
 					continue
 
@@ -95,7 +107,8 @@ class VidePrinter(threading.Thread):
 				# Find new events
 				for dctEvent in lstEvents:
 					objEvent = MatchEvent(dctEvent, self.objLogger)
-					if objEvent.strUniqueId != self.getLastEvent():
+					if  objEvent.strUniqueId != self.getLastEvent() \
+					and (not bolFirstRun or (len(lstNewEvents) <= self.intFirstRunMaxEvents or self._bolReplay)):
 						lstNewEvents.insert(0, objEvent)
 					else:
 						# Found an existing event so schtop!
@@ -110,7 +123,7 @@ class VidePrinter(threading.Thread):
 					self.outputEvent(objEvent)
 
 				if len(lstNewEvents) == 0 and not self.__objStop.isSet():
-					time.sleep(10)
+					time.sleep(5)
 		except:
 			self.objLogger.error(traceback.format_exc())
 			self.stop()
