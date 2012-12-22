@@ -24,11 +24,20 @@ class VidePrinter(threading.Thread):
 		self.__objStop.set()
 		self.join()
 
+	def isStopped(self):
+		return self.__objStop.isSet()
+
 	def enableReplay(self):
 		self._bolReplay = True
 
 	def getLastEvent(self):
 		return self._strLastEvent
+
+	def pause(self, intSeconds):
+		intPaused = 0
+		while (not self.isStopped() and intPaused < intSeconds):
+			time.sleep(1)
+			intPaused += 1
 
 	def outputEvent(self, e):
 		fncOutput = getattr(self, '_output_' + e.strEventType, None)
@@ -80,12 +89,11 @@ class VidePrinter(threading.Thread):
 
 	# Main event loop
 	# TODO: Tidy this up
-	# TODO: Change sleeps to allow interrupts
 	def run(self):
 		bolFirstRun = True
 		try:
 			bolLastRunEmpty = False
-			while not self.__objStop.isSet():
+			while not self.isStopped():
 				lstEvents = self.objFeed.getEvents()
 
 				if not lstEvents:
@@ -93,7 +101,7 @@ class VidePrinter(threading.Thread):
 						self.objOutput.addLine([('No matches in progress', self.objOutput.C_GREEN)])
 					bolLastRunEmpty = True
 					bolFirstRun     = False
-					time.sleep(5)
+					self.pause(30)
 					continue
 
 				bolLastRunEmpty = False
@@ -108,7 +116,7 @@ class VidePrinter(threading.Thread):
 				for dctEvent in lstEvents:
 					objEvent = MatchEvent(dctEvent, self.objLogger)
 					if  objEvent.strUniqueId != self.getLastEvent() \
-					and (not bolFirstRun or (len(lstNewEvents) <= self.intFirstRunMaxEvents or self._bolReplay)):
+					and (not bolFirstRun or len(lstNewEvents) <= self.intFirstRunMaxEvents or self._bolReplay):
 						lstNewEvents.insert(0, objEvent)
 					else:
 						# Found an existing event so schtop!
@@ -118,12 +126,13 @@ class VidePrinter(threading.Thread):
 					self.objLogger.info("Received {0} events".format(len(lstNewEvents)))
 				# Loop through all new events (already ordered oldest first)
 				for objEvent in lstNewEvents:
-					if self.__objStop.isSet():
+					if self.isStopped():
 						break
 					self.outputEvent(objEvent)
 
-				if len(lstNewEvents) == 0 and not self.__objStop.isSet():
-					time.sleep(5)
+				# To save spamming the feed too much
+				if len(lstNewEvents) == 0:
+					self.pause(10)
 		except:
 			self.objLogger.error(traceback.format_exc())
 			self.stop()

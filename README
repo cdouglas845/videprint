@@ -3,4 +3,7 @@ Basic terminal based videprint tool that uses the BBC feed to show live football
 Usage:
  => Create a writeable log file located at /var/log/videprinter.log
  => python main.py
+ => To see more usage options, pass in -h or --help
  => To exit, press any key
+
+By default, VidePrint will show the last few events on the feed.
