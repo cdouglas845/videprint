@@ -1,3 +1,6 @@
 Basic terminal based videprint tool that uses the BBC feed to show live football scores
 
-NB: This is an old project that is hardly even fit for purpose - I've only uploaded this just to test out github features
+Usage:
+ => Create a writeable log file located at /var/log/videprinter.log
+ => python main.py
+ => To exit, press any key
