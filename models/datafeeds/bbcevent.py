@@ -26,4 +26,13 @@ class BbcEventFeed:
 		strRaw  = self._fetchRawData()
 		strData = self.stripHtmlComments(strRaw)
 		dctData = simplejson.loads(strData)
-		return dctData['footballVideprinter']['matchEvent'] if 'matchEvent' in dctData['footballVideprinter'] else None
+
+		if 'matchEvent' in dctData['footballVideprinter']:
+			# The match events are an ordered list, newest first
+			lstEvents = dctData['footballVideprinter']['matchEvent']
+			# Unless there is only one event (doh!) so put it in a list
+			if type(lstEvents) is not list:
+				lstEvents = [lstEvents]
+			return lstEvents
+
+		return None

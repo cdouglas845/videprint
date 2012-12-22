@@ -2,11 +2,12 @@ import time
 import threading
 import traceback
 
-from models.matchevent import MatchEvent
+from models.events._match_event import MatchEvent
+from models.events.goal import Goal
+from models.events.dismissal import Dismissal
+from models.events.status import Status
 
 # Designed to run its own thread to allow multiple feeds
-# TODO: The output methods _really_ need separating out,
-#       currently its far too tightly coupled
 class VidePrinter(threading.Thread):
 
 	intFirstRunMaxEvents = 5
@@ -39,53 +40,21 @@ class VidePrinter(threading.Thread):
 			time.sleep(1)
 			intPaused += 1
 
-	def outputEvent(self, e):
-		fncOutput = getattr(self, '_output_' + e.strEventType, None)
+	def loadEvent(self, dctEvent):
+		# TODO: This needs decoupling!
+		strEventType = dctEvent['event']['eventType']
+		if strEventType == MatchEvent.ET_GOAL:
+			return Goal(dctEvent)
+		if strEventType == MatchEvent.ET_PENALTY:
+			return Goal(dctEvent)
+		if strEventType == MatchEvent.ET_MATCHSTATUS:
+			return Status(dctEvent)
+		if strEventType == MatchEvent.ET_DISMISSAL:
+			return Dismissal(dctEvent)
 
-		if callable(fncOutput):
-			fncOutput(e)
-		else:
-			# Unknown eventType found, log the error
-			self.objLogger.error('VidePrinter encountered an unknown event type: ' + e.strEventType)
-		self._strLastEvent = e.strUniqueId
-
-	def _output_DISMISSAL(self, e):
-		strTeam = e.strHomeTeam if e.bolHomeTeam else e.strAwayTeam
-		lstLine = []
-		lstLine.append(('OFF: ', self.objOutput.C_RED))
-		lstLine.append(('{player} ({team}) '.format(player=e.strPlayer, team=strTeam), self.objOutput.C_RED))
-		lstLine.append((' - {comment} {mins}\''.format(comment=e.strComment, mins=e.intMins), self.objOutput.C_END))
-		self.objOutput.addLine(lstLine)
-
-	def _output_MATCHSTATUS(self, e):
-		# This appears to be a duplicate event of FULLTIME
-		# So swallow this one to avoid double output
-		if e.strMatchStatus == 'RESULT':
-			return
-		lstLine = []
-		lstLine.append(('{status}: '.format(status=e.strMatchStatus), self.objOutput.C_BLUE))
-		lstLine.append(('{homeTeam} {homeScore}'.format(homeTeam=e.strHomeTeam, homeScore=e.intHomeScore), self.objOutput.C_BLUE))
-		lstLine.append(('-', self.objOutput.C_BLUE))
-		lstLine.append(('{awayScore} {awayTeam}'.format(awayScore=e.intAwayScore, awayTeam=e.strAwayTeam), self.objOutput.C_BLUE))
-		self.objOutput.addLine(lstLine)
-
-	def _output_GOAL(self, e, bolPenalty=False):
-		strPen        = '(pen)' if bolPenalty else ''
-		strHomeColour = self.objOutput.C_GREEN if e.bolHomeTeam else self.objOutput.C_END
-		strAwayColour = self.objOutput.C_GREEN if not e.bolHomeTeam else self.objOutput.C_END
-
-		lstLine = []
-		lstLine.append(('GOAL: ', self.objOutput.C_GREEN))
-		lstLine.append(('{homeTeam} {homeScore}'.format(homeTeam=e.strHomeTeam, homeScore=e.intHomeScore), strHomeColour))
-		lstLine.append(('-', self.objOutput.C_END))
-		lstLine.append(('{awayScore} {awayTeam} '.format(awayScore=e.intAwayScore, awayTeam=e.strAwayTeam), strAwayColour))
-		lstLine.append(('{player}{pen} {mins}\''.format(player=e.strPlayer, pen=strPen, mins=e.intMins), self.objOutput.C_GREEN))
-		self.objOutput.addLine(lstLine)
-
-	def _output_PENALTY(self, e):
-		strTeam = e.strHomeTeam if e.bolHomeTeam else e.strAwayTeam
-		if e.strPenOutcome == 'SCORED':
-			self._output_GOAL(e, True)
+	def outputEvent(self, objEvent):
+		objEvent.writeOutput(self.objOutput)
+		self._strLastEvent = objEvent.strUniqueId
 
 	# Main event loop
 	# TODO: Tidy this up
@@ -105,16 +74,11 @@ class VidePrinter(threading.Thread):
 					continue
 
 				bolLastRunEmpty = False
-
-				# The match events are an ordered list, newest first
-				# Unless there is only one event (doh!) so put it in a list
-				lstNewEvents = []
-				if type(lstEvents) is not list:
-					lstEvents = [lstEvents]
+				lstNewEvents    = []
 
 				# Find new events
 				for dctEvent in lstEvents:
-					objEvent = MatchEvent(dctEvent, self.objLogger)
+					objEvent = self.loadEvent(dctEvent)
 					if  objEvent.strUniqueId != self.getLastEvent() \
 					and (not bolFirstRun or len(lstNewEvents) <= self.intFirstRunMaxEvents or self._bolReplay):
 						lstNewEvents.insert(0, objEvent)
