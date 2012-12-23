@@ -10,8 +10,12 @@ from controllers.videprint import VidePrinter
 
 class Main(object):
 
+	OUTPUT_TYPE_BASIC = 'BASIC'
+	OUTPUT_TYPE_UI    = 'UI'
+
 	def __init__(self):
 		self._bolFullReplay = False
+		self._outputType    = self.OUTPUT_TYPE_UI
 		self.objLogger = self.getLogger()
 		self._parseOptions()
 		self.objFeed = BbcEventFeed()
@@ -21,6 +25,12 @@ class Main(object):
 
 	def needsFullReplay(self):
 		return self._bolFullReplay
+
+	def setBasicOutput(self):
+		self._outputType = self.OUTPUT_TYPE_BASIC
+
+	def getOutputType(self):
+		return self._outputType
 
 	def getLogger(self):
 		# Will normally exist, so this is faster
@@ -45,12 +55,33 @@ class Main(object):
 		                  action='store_true', dest='bolFullReplay', default=False,
 		                  help='Perform a full replay of all events on feed')
 
+		parser.add_option('-b', '--basic',
+		                  action='store_true', dest='bolBasicOutput', default=False,
+		                  help='Use the basic stdout display rather than the UI')
+
 		(objOptions, dctArgs) = parser.parse_args()
 
 		self.setFullReplay(objOptions.bolFullReplay)
 
+		if objOptions.bolBasicOutput:
+			self.setBasicOutput()
+
 	def addTerminalPrinter(self):
 		from views.termprint import TerminalOutput
+
+		objOutput = TerminalOutput()
+		objVide = VidePrinter(self.objFeed, objOutput, self.getLogger())
+		if self.needsFullReplay():
+			objVide.enableReplay()
+		objVide.start()
+
+		# bit hacky, but exit on a keypress for now
+		try:
+			sys.stdin.read(1)
+		except:
+			self.getLogger().error(traceback.format_exc())
+		finally:
+			objVide.stop()
 
 	def addTerminalUi(self):
 		from views.termui import TerminalUi
@@ -80,7 +111,10 @@ class Main(object):
 			objVide.stop()
 
 	def start(self):
-		self.addTerminalUi()
+		if self.getOutputType() == self.OUTPUT_TYPE_UI:
+			self.addTerminalUi()
+		else:
+			self.addTerminalPrinter()
 
 if __name__ == '__main__':
 	objMain = Main()
